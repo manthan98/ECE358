@@ -5,7 +5,7 @@ from enum import Enum
 
 def generateRandomVariable(l=75):
     u = random.uniform(0, 1)
-    x = -1 * (1 / l) * math.log(1 - u)
+    x = (-1 / l) * math.log(1 - u)
     return x
 
 def q1():
@@ -54,14 +54,12 @@ def infiniteBufferDes(events, T, L, C):
     observations = 0
     e_n = 0
 
-    print(len(events))
     while len(events) > 0:
         event = events.pop(0)
         if event.time >= T:
             break
-        
-        if event.event_type == EventType.OBSERVER:
-            print(event.time)
+
+        print(event.time, event.event_type)
 
         buffer_length = num_arrivals - num_departures
         if buffer_length == 0 and event.event_type == EventType.ARRIVAL:
@@ -77,22 +75,43 @@ def infiniteBufferDes(events, T, L, C):
         else:
             if event.event_type == EventType.ARRIVAL:
                 service_time = generateRandomVariable(1 / L) / C
-                departure_time = service_time + last_departure_time
+                departure_time = service_time + (last_departure_time if last_departure_time != 0 else event.time)
                 if departure_time < T:
                     events.append(Event(departure_time, EventType.DEPARTURE))
                     events.sort(key=lambda x: x.time, reverse=False)
                 num_arrivals += 1
             elif event.event_type == EventType.DEPARTURE:
+                last_departure_time = event.time
                 num_departures += 1
             else:
                 total_packets += buffer_length
                 observations += 1
-                e_n += (e_n + buffer_length) / observations
     
-    print("Finished simulation: ", e_n)
+    e_n = total_packets / observations
+    idle = (empty_counter / observations) * 100
+    print("Finished simulation: ", e_n, idle)
+    return (e_n, idle)
 
-rho, C, L = 0.25, 10 ** 6, 2000
+def q3():
+    E_N = []
+    P_idle = []
+    for i in range(0.25, 1.05, 0.1):
+        rho, C, L, = i, 10 ** 6, 2000
+        l = rho * (C / L)
+        T = 50
+        events = buildEventsForInfiniteBuffer(T, l)
+        infiniteBufferDes(events, T, L, C)
+
+rho, C, L = 0.85, 10 ** 6, 2000
 l = rho * (C / L)
-T = 10
+T = 50
 events = buildEventsForInfiniteBuffer(T, l)
 infiniteBufferDes(events, T, L, C)
+
+# rho = 0.25 - Finished simulation:  0.20161675312688965 80.13271379014035
+# rho = 0.35 - Finished simulation:  0.27125114995400185 73.65455381784729
+# rho = 0.45 - Finished simulation:  0.3428809887416983 67.23905245587243
+# rho - 0.55 - Finished simulation:  0.38393324417049485 63.922486480200035
+# rho - 0.65 - Finished simulation:  0.45480400643007296 58.178558179794734
+# rho - 0.75 - Finished simulation:  0.5186591439937714 53.897676006015296
+# rho - 0.85 - Finished simulation:  0.5697346239084727 50.62508287083515
