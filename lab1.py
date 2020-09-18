@@ -4,33 +4,24 @@ import time
 from enum import Enum
 import matplotlib.pyplot as plt
 
-def generateRandomVariable(l=75):
-    u = random.uniform(0, 1)
-    x = (-1 / l) * math.log(1 - u)
-    return x
+from multiprocessing import Pool, cpu_count
 
-def q1():
-    random_variables = []
-    for i in range(0, 1000):
-        random_variables.append(generateRandomVariable())
-
-    mean = sum(random_variables) / len(random_variables)
-    variance = sum((xi - mean) ** 2 for xi in random_variables) / len(random_variables)
-
-    # E(x) for exponential random variable = 1 / lambda
-    # Var(x) for exponential random variable = 1 / lambda^2
-    # https://math.berkeley.edu/~scanlon/m16bs04/ln/16b2lec31.pdf
-    print(mean, variance)
-
+# Enumeration that defines the different event types.
 class EventType(Enum):
     ARRIVAL = 0
     DEPARTURE = 1
     OBSERVER = 2
 
+# Data structure that describes an event based on it's simulation time and type.
 class Event:
     def __init__(self, time, event_type):
         self.time = time
         self.event_type = event_type
+
+def generateRandomVariable(l=75):
+    u = random.uniform(0, 1)
+    x = (-1 / l) * math.log(1 - u)
+    return x
 
 def buildEventsForInfiniteBuffer(T, l, L, C):
     event_queue = []
@@ -57,14 +48,14 @@ def buildEventsForInfiniteBuffer(T, l, L, C):
             observer_event = Event(obs_t, EventType.OBSERVER)
             event_queue.append(observer_event)
     
-    event_queue.sort(key=lambda x: x.time, reverse=False)
+    event_queue.sort(key=lambda x: x.time, reverse=True)
     return event_queue
 
 def infiniteBufferDes(events, T, L, C):
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
 
     while len(events) > 0:
-        event = events.pop(0)
+        event = events.pop()
         if event.time >= T:
             break
 
@@ -150,20 +141,50 @@ def finiteBufferDes(T, l, L, C, K, events):
     print(e_n, p_loss, p_idle)
     return (e_n, p_loss, p_idle)
 
-def q3():
+def q1():
+    random_variables = []
+    for i in range(0, 1000):
+        random_variables.append(generateRandomVariable())
+
+    mean = sum(random_variables) / len(random_variables)
+    variance = sum((xi - mean) ** 2 for xi in random_variables) / len(random_variables)
+
+    # E(x) for exponential random variable = 1 / lambda
+    # Var(x) for exponential random variable = 1 / lambda^2
+    # https://math.berkeley.edu/~scanlon/m16bs04/ln/16b2lec31.pdf
+    print(mean, variance)
+
+def infiniteBufferDesWrapper(args):
+    return infiniteBufferDes(*args)
+
+def buildEventsForInfiniteBufferWrapper(args):
+    return buildEventsForInfiniteBuffer(*args)
+
+# Takes ~7 minutes for T = 1000
+def q3(T=1000):
     E_N = []
     P_idle = []
 
-    rho_list = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-    for rho in rho_list:
-        C, L, = 10 ** 6, 2000
-        l = rho * (C / L)
-        T = 1000
-        events = buildEventsForInfiniteBuffer(T, l, L, C)
-        des = infiniteBufferDes(events, T, L, C)
-        E_N.append(des[0])
-        P_idle.append(des[1])
+    pool = Pool(cpu_count())
 
+    C, L, = 10 ** 6, 2000
+    rho_list = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+    events_list_args = []
+    for rho in rho_list:
+        l = rho * (C / L)
+        events_list_args.append((T, l, L, C))
+    
+    events_list = pool.map(buildEventsForInfiniteBufferWrapper, events_list_args)
+
+    des_args = []
+    for events in events_list:
+        des_args.append((events, T, L, C))
+    
+    results = pool.map(infiniteBufferDesWrapper, des_args)
+    for result in results:
+        E_N.append(result[0])
+        P_idle.append(result[1])
+    
     plt.plot(rho_list, E_N)
     plt.title(r'E[N] vs $\rho$')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
@@ -179,7 +200,7 @@ def q3():
 def q4():
     rho, C, L = 1.2, 10 ** 6, 2000
     l = rho * (C / L)
-    T = 50
+    T = 1000
     events = buildEventsForInfiniteBuffer(T, l, L, C)
     des = infiniteBufferDes(events, T, L, C)
     print(des[0], des[1])
@@ -187,7 +208,7 @@ def q4():
 def q6():
     rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     K_steps = [10, 25, 40]
-    T = 1000
+    T = 100
     L, C = 2000, 10 ** 6
 
     E_Ns = []
@@ -221,29 +242,4 @@ def q6():
     plt.ylabel(r'$P_{loss}$ (%)')
     plt.show()
 
-# 0.33384482700686596 74.91899572297417 - rho = 0.25
-# 0.5450760453016397 64.76329721919208 - rho = 0.35
-# 0.8214175136658695 54.93777402915385 - rho = 0.45
-# 1.2285164239287871 44.90221339097903 - rho = 0.55
-# 1.853504090501381 34.938465487914414 - rho = 0.65
-# 2.990750445418032 25.12546874183667 - rho = 0.75
-# 5.829317597101947 14.61906566518453 - rho = 0.85
-# 19.017634391211487 4.988878738447555 - rho = 0.95
-
-# E_N = [0.33384482700686596, 0.5450760453016397, 0.8214175136658695, 1.2285164239287871, 1.853504090501381, 2.990750445418032, 5.829317597101947, 19.017634391211487]
-# P_idle = [74.91899572297417, 64.76329721919208, 54.93777402915385, 44.90221339097903, 34.938465487914414, 25.12546874183667, 14.61906566518453, 4.988878738447555]
-# rho_list = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-
-# plt.plot(rho_list, E_N)
-# plt.title(r'E[N] vs $\rho$')
-# plt.xlabel(r'Traffic Intensity ($\rho$)')
-# plt.ylabel('Average number in system E[N]')
-# plt.show()
-
-# plt.plot(rho_list, P_idle)
-# plt.title(r'$P_{idle}$ vs $\rho$')
-# plt.xlabel(r'Traffic Intensity ($\rho$)')
-# plt.ylabel(r'$P_{idle}$ (%)')
-# plt.show()
-
-# 49884.367167411154 0.00043322762579264 - rho = 1.2
+q3()
