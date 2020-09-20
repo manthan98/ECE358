@@ -30,11 +30,18 @@ def buildEventsForInfiniteBuffer(T, l, L, C):
     last_departure_time = 0
     while delta_t < T or obs_t < T:
         if delta_t < T:
+            # Determine the next arrival event time, create the arrival event, and
+            # add it to the queue.
             delta_t += generateRandomVariable(l)
             arrival_event = Event(delta_t, EventType.ARRIVAL)
             event_queue.append(arrival_event)
 
+            # Compute the service time as L / C, where L follows exp. dist.
             service_time = generateRandomVariable(1 / L) / C
+
+            # If arrival time occurs before last departure event has exited queue,
+            # then we compute departure event time as last time + service time. Otherwise,
+            # compute as arrival time + service time (no other packets in queue).
             if arrival_event.time < last_departure_time:
                 departure_event = Event(last_departure_time + service_time, EventType.DEPARTURE)
             else:
@@ -44,6 +51,7 @@ def buildEventsForInfiniteBuffer(T, l, L, C):
             event_queue.append(departure_event)
         
         if obs_t < T:
+            # Add observer events at a rate 5x that of arrival events.
             obs_t += generateRandomVariable(5 * l)
             observer_event = Event(obs_t, EventType.OBSERVER)
             event_queue.append(observer_event)
@@ -52,6 +60,7 @@ def buildEventsForInfiniteBuffer(T, l, L, C):
     return event_queue
 
 def infiniteBufferDes(events, T, L, C):
+    # Setup variables for computing e_n and p_loss.
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
 
     while len(events) > 0:
@@ -66,13 +75,19 @@ def infiniteBufferDes(events, T, L, C):
         elif event.event_type == EventType.DEPARTURE:
             num_departures += 1
         else:
+            # Determine the buffer length and increment total packets that have
+            # been observed.
             buffer_length = num_arrivals - num_departures
             total_packets += buffer_length
             observations += 1
             if buffer_length == 0:
                 empty_counter += 1
     
+    # e_n is average # of packets based on total # of observer events.
     e_n = total_packets / observations
+
+    # p_loss if average # of times empty buffer was observed based 
+    # on total # of observer events.
     p_loss = (empty_counter / observations) * 100
     return (e_n, p_loss)
 
@@ -162,40 +177,53 @@ def buildEventsForInfiniteBufferWrapper(args):
 
 # Takes ~7 minutes for T = 1000
 def q3(T=1000):
+    # Setup lists to append values to as: 0.25 < rho < 0.95.
     E_N = []
     P_idle = []
 
+    # Total # of CPU cores we can use to multiprocess the simulation.
     pool = Pool(cpu_count())
 
     C, L, = 10 ** 6, 2000
     rho_list = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
     events_list_args = []
+
+    # For each value of rho, we compute the arrival rate, and append to our
+    # args list to be used for generating all events for all rho.
     for rho in rho_list:
         l = rho * (C / L)
         events_list_args.append((T, l, L, C))
     
+    # List of arr/obs/dep events for each value of rho from 0.25 to 0.95.
     events_list = pool.map(buildEventsForInfiniteBufferWrapper, events_list_args)
 
+    # For each list of events, append to our args list for the DES.
     des_args = []
     for events in events_list:
         des_args.append((events, T, L, C))
     
+    # Multiprocess the DES, and strip out the e_n and p_loss values from each
+    # simulation for each rho.
     results = pool.map(infiniteBufferDesWrapper, des_args)
     for result in results:
         E_N.append(result[0])
         P_idle.append(result[1])
-    
+
+    f = plt.figure()
     plt.plot(rho_list, E_N)
     plt.title(r'E[N] vs $\rho$')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel('Average number in system E[N]')
     plt.show()
+    f.savefig("en_q3_figure.pdf")
 
+    f = plt.figure()
     plt.plot(rho_list, P_idle)
     plt.title(r'$P_{idle}$ vs $\rho$')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel(r'$P_{idle}$ (%)')
     plt.show()
+    f.savefig("pidle_q3_figure.pdf")
 
 def q4():
     rho, C, L = 1.2, 10 ** 6, 2000
