@@ -86,10 +86,10 @@ def infiniteBufferDes(events, T, L, C):
     # e_n is average # of packets based on total # of observer events.
     e_n = total_packets / observations
 
-    # p_loss if average # of times empty buffer was observed based 
+    # p_idle if average # of times empty buffer was observed based 
     # on total # of observer events.
-    p_loss = (empty_counter / observations) * 100
-    return (e_n, p_loss)
+    p_idle = (empty_counter / observations) * 100 
+    return (e_n, p_idle)
 
 def buildEventsForFiniteDes(T, l):
     event_queue = []
@@ -104,8 +104,19 @@ def buildEventsForFiniteDes(T, l):
             obs_t += generateRandomVariable(5 * l)
             event_queue.append(Event(obs_t, EventType.OBSERVER))
     
-    event_queue.sort(key=lambda x: x.time, reverse=False)
+    event_queue.sort(key=lambda x: x.time, reverse=True)
     return event_queue
+
+def testRobustnessOfFiniteBuffer():
+    # rho_steps = [0.5, 1.5]
+    rho = 1.5
+    K_steps = 25
+    T = 4000
+    L, C = 2000, 10 ** 6
+    l = rho * (C / L)
+    event_queue = buildEventsForFiniteDes(T,l)
+    e_n, p_loss, p_idle = finiteBufferDes(T, l, L, C, K_steps, event_queue)
+    print("E[n]: ", e_n, " P_loss: ", p_loss, " p_idle: ", p_idle)    
 
 def finiteBufferDes(T, l, L, C, K, events):
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
@@ -115,14 +126,14 @@ def finiteBufferDes(T, l, L, C, K, events):
     departure_times = []
     while len(events) > 0:
         departure_time = departure_times[0] if len(departure_times) > 0 else float('inf')
-        event = events[0]
+        event = events[len(events)-1]
 
         if event.time >= T or last_departure_time >= T:
             break
 
         buffer_length = num_arrivals - num_departures
         if event.time < departure_time:
-            events.pop(0)
+            events.pop()
             if event.event_type == EventType.ARRIVAL:
                 print("ARRIVAL", event.time)
                 if buffer_length == K:
@@ -153,7 +164,7 @@ def finiteBufferDes(T, l, L, C, K, events):
     e_n = total_packets / observations
     p_loss = (loss_counter / (num_arrivals + lost_arrivals)) * 100
     p_idle = (empty_counter / observations) * 100
-    print(e_n, p_loss, p_idle)
+    # print(e_n, p_loss, p_idle)
     return (e_n, p_loss, p_idle)
 
 def q1():
@@ -174,6 +185,12 @@ def infiniteBufferDesWrapper(args):
 
 def buildEventsForInfiniteBufferWrapper(args):
     return buildEventsForInfiniteBuffer(*args)
+
+def finiteBufferDesWrapper(args):
+    return finiteBufferDes(*args)
+
+def buildEventsForFiniteBufferWrapper(args):
+    return buildEventsForFiniteDes(*args)
 
 # Takes ~7 minutes for T = 1000
 def q3(T=1000):
@@ -202,7 +219,7 @@ def q3(T=1000):
     for events in events_list:
         des_args.append((events, T, L, C))
     
-    # Multiprocess the DES, and strip out the e_n and p_loss values from each
+    # Multiprocess the DES, and strip out the e_n and p_idle values from each
     # simulation for each rho.
     results = pool.map(infiniteBufferDesWrapper, des_args)
     for result in results:
@@ -234,26 +251,54 @@ def q4():
     print(des[0], des[1])
 
 def q6():
-    rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-    K_steps = [10, 25, 40]
-    T = 100
-    L, C = 2000, 10 ** 6
-
+    # Setup lists to append values to as: 0.5 < rho < 1.5.
     E_Ns = []
     P_LOSSes = []
 
+    # Total # of CPU cores we can use to multiprocess the simulation.
+    pool = Pool(cpu_count())
+
+    rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
+    K_steps = [10, 25, 50]
+    T = 1000
+    L, C = 2000, 10 ** 6
+
+    events_list_args = []
+    des_list_args = []
+    K_args = []
+    l_args = []
     for K in K_steps:
-        e_n = []
-        p_loss = []
         for rho in rho_steps:
             l = rho * (C / L)
-            events = buildEventsForFiniteDes(T, l)
-            des = finiteBufferDes(T, l, L, C, K, events)
-            e_n.append(des[0])
-            p_loss.append(des[1])
-        E_Ns.append(e_n)
-        P_LOSSes.append(p_loss)
+            events_list_args.append((T,l))
+            K_args.append(K)
+            l_args.append(l)
+    
+    events_list = pool.map(buildEventsForFiniteBufferWrapper, events_list_args)
+    print("done building events")
+    
+    # T, l, L, C, K, events
+    for events, K, l in zip(events_list, K_args, l_args):
+        des_list_args.append((T, l, L, C, K, events))
 
+    results = pool.map(finiteBufferDesWrapper, des_list_args)
+    print("done running simulation")
+
+    count = 0
+    e_n = []
+    p_loss = []
+    for result in results:
+        e_n.append(result[0])
+        p_loss.append(result[1])
+        if count % (len(rho_steps) - 1) == 0 and count != 0:
+            E_Ns.append(e_n)
+            P_LOSSes.append(p_loss)
+            e_n = []
+            p_loss = []
+            count = 0
+        else:
+            count = count + 1
+        
     for i in range(len(E_Ns)):
         plt.plot(rho_steps, E_Ns[i], label=f"K = {K_steps[i]}")
     plt.legend(loc="upper left")
@@ -270,4 +315,5 @@ def q6():
     plt.ylabel(r'$P_{loss}$ (%)')
     plt.show()
 
-q3()
+# testRobustnessOfFiniteBuffer()
+q6()
