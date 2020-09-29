@@ -259,59 +259,23 @@ def q6():
     E_Ns = []
     P_LOSSes = []
 
-    # Total # of CPU cores we can use to multiprocess the simulation.
-    pool = Pool(cpu_count())
-
     rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     K_steps = [10, 25, 50]
     T = 1000
     L, C = 2000, 10 ** 6
 
-    events_list_args = []
-    des_list_args = []
-    K_args = []
-    l_args = []
     for K in K_steps:
+        e_n = []
+        p_loss = []
         for rho in rho_steps:
             l = rho * (C / L)
-            events_list_args.append((T,l))
-            K_args.append(K)
-            l_args.append(l)
-    
-    all_events_list = []
-    for i in [0, 11, 22]:
-        events_list = pool.map(buildEventsForFiniteBufferWrapper, events_list_args[i:i+11])
-        all_events_list.append(events_list)
-    print("done building events")
-    
-    i = 0
-    for events_list in all_events_list:
-        for events in events_list:
-            des_list_args.append((T, l_args[i], L, C, K_args[i], events))
-            i = i + 1
+            events = buildEventsForFiniteDes(T, l)
+            des = finiteBufferDes(T, l, L, C, K, events)
+            e_n.append(des[0])
+            p_loss.append(des[1])
+        E_Ns.append(e_n)
+        P_LOSSes.append(p_loss)
 
-    all_results_list = []
-    for i in [0, 11, 22]:
-        results_list = pool.map(finiteBufferDesWrapper, des_list_args[i:i+11])
-        all_results_list.append(results_list)
-    print("done running simulation")
-
-    count = 0
-    e_n = []
-    p_loss = []
-    for results_list in all_results_list:
-        for result in results_list:
-            e_n.append(result[0])
-            p_loss.append(result[1])
-            if count % (len(rho_steps) - 1) == 0 and count != 0:
-                E_Ns.append(e_n)
-                P_LOSSes.append(p_loss)
-                e_n = []
-                p_loss = []
-                count = 0
-            else:
-                count = count + 1
-    
     f = plt.figure()
     for i in range(len(E_Ns)):
         plt.plot(rho_steps, E_Ns[i], label=f"K = {K_steps[i]}")
@@ -319,8 +283,8 @@ def q6():
     plt.title(r'E[N] vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel('Average number in system E[N]')
-    # plt.show()
-    f.savefig("en_q6_figure.pdf")
+    plt.show()
+    f.savefig("en_vs_p_q6_figure.pdf")
 
     f = plt.figure()
     for i in range(len(P_LOSSes)):
@@ -329,8 +293,7 @@ def q6():
     plt.title(r'$P_{loss}$ vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel(r'$P_{loss}$ (%)')
-    # plt.show()
-    f.savefig("ploss_q6_figure.pdf")
+    plt.show()
+    f.savefig("ploss_vs_p_q6_figure.pdf")
 
-# testRobustnessOfFiniteBuffer()
 q6()
