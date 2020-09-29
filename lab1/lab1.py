@@ -61,7 +61,7 @@ def buildEventsForInfiniteBuffer(T, l, L, C):
     return event_queue
 
 def infiniteBufferDes(events, T, L, C):
-    # Setup variables for computing e_n and p_loss.
+    # Setup variables for computing e_n and p_idle.
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
 
     while len(events) > 0:
@@ -96,6 +96,8 @@ def buildEventsForFiniteDes(T, l):
     event_queue = deque()
     delta_t, obs_t = 0, 0
 
+    # only generate arrival and observer events since departure events
+    # will be created during the simulation
     while delta_t < T or obs_t < T:
         if delta_t < T:
             delta_t += generateRandomVariable(l)
@@ -121,6 +123,15 @@ def testRobustnessOfFiniteBuffer():
     print("E[n]: ", e_n, " P_loss: ", p_loss, " p_idle: ", p_idle)    
 
 def finiteBufferDes(T, l, L, C, K, events):
+    # setup variables for computing e_n and p_loss
+    # num_arrivals: number of arrival events of packets that are not dropped
+    # num_departures: number of departure events
+    # total_packets: the total number of packets, dropped and not dropped
+    # observations: number of observation events
+    # empty_counter: times during an observation the queue is empty
+    # last_departure_time: the departure time of the most recently departed packet
+    # loss_counter = number of packets dropepd
+    # lost_arrivals = number of arrival events of packets that are dropped
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
     last_departure_time, loss_counter = 0, 0
     lost_arrivals = 0
@@ -130,20 +141,27 @@ def finiteBufferDes(T, l, L, C, K, events):
         departure_time = departure_times[-1] if departure_times else float('inf')
         event = events[-1]
 
+        # exit function if event time or departure time is greater than the simulation time
         if event.time >= T or last_departure_time >= T:
             break
 
+        # Note: num_arrivals only refers to packets that will have a corresponding departure
         buffer_length = num_arrivals - num_departures
         if event.time < departure_time:
             events.pop()
             if event.event_type == EventType.ARRIVAL:
                 # print("ARRIVAL", event.time)
+                # if buffer is full, the packet will be dropped
                 if buffer_length == K:
                     loss_counter += 1
                     lost_arrivals += 1
                     continue
 
+                # the service rate follows an exponential distribution 
                 service_time = generateRandomVariable(1 / L) / C
+                # if buffer is empty, departure time is the service time + the arrival time
+                # if buffer is not empty, departure time is the service time + the departure time 
+                # of the last packet
                 if buffer_length == 0:
                     last_departure_time = service_time + event.time
                     departure_times.appendleft(last_departure_time)
