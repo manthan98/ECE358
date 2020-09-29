@@ -319,4 +319,4 @@ def q6(T=1000):
     plt.show()
     f.savefig("ploss_q6_figure.pdf")
 
-q6()
+# Call function here
