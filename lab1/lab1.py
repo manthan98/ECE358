@@ -5,6 +5,7 @@ from enum import Enum
 import matplotlib.pyplot as plt
 
 from multiprocessing import Pool, cpu_count
+from collections import deque
 
 # Enumeration that defines the different event types.
 class EventType(Enum):
@@ -92,19 +93,20 @@ def infiniteBufferDes(events, T, L, C):
     return (e_n, p_idle)
 
 def buildEventsForFiniteDes(T, l):
-    event_queue = []
+    event_queue = deque()
     delta_t, obs_t = 0, 0
 
     while delta_t < T or obs_t < T:
         if delta_t < T:
             delta_t += generateRandomVariable(l)
-            event_queue.append(Event(delta_t, EventType.ARRIVAL))
+            event_queue.appendleft(Event(delta_t, EventType.ARRIVAL))
 
         if obs_t < T:
             obs_t += generateRandomVariable(5 * l)
-            event_queue.append(Event(obs_t, EventType.OBSERVER))
+            event_queue.appendleft(Event(obs_t, EventType.OBSERVER))
     
-    event_queue.sort(key=lambda x: x.time, reverse=True)
+    # event_queue.sort(key=lambda x: x.time, reverse=True)
+    print("Finished an event gen")
     return event_queue
 
 def testRobustnessOfFiniteBuffer():
@@ -123,10 +125,10 @@ def finiteBufferDes(T, l, L, C, K, events):
     last_departure_time, loss_counter = 0, 0
     lost_arrivals = 0
 
-    departure_times = []
-    while len(events) > 0:
-        departure_time = departure_times[0] if len(departure_times) > 0 else float('inf')
-        event = events[len(events)-1]
+    departure_times = deque()
+    while events:
+        departure_time = departure_times[-1] if departure_times else float('inf')
+        event = events[-1]
 
         if event.time >= T or last_departure_time >= T:
             break
@@ -135,7 +137,7 @@ def finiteBufferDes(T, l, L, C, K, events):
         if event.time < departure_time:
             events.pop()
             if event.event_type == EventType.ARRIVAL:
-                print("ARRIVAL", event.time)
+                # print("ARRIVAL", event.time)
                 if buffer_length == K:
                     loss_counter += 1
                     lost_arrivals += 1
@@ -144,27 +146,28 @@ def finiteBufferDes(T, l, L, C, K, events):
                 service_time = generateRandomVariable(1 / L) / C
                 if buffer_length == 0:
                     last_departure_time = service_time + event.time
-                    departure_times.append(last_departure_time)
+                    departure_times.appendleft(last_departure_time)
                 else:
                     last_departure_time += service_time
-                    departure_times.append(last_departure_time)
+                    departure_times.appendleft(last_departure_time)
                 
                 num_arrivals += 1
             else:
-                print("OBSERVER", event.time)
+                # print("OBSERVER", event.time)
                 total_packets += buffer_length
                 observations += 1
                 if buffer_length == 0:
                     empty_counter += 1
         else:
-            print("DEPARTURE", departure_time)
-            departure_times.pop(0)
+            # print("DEPARTURE", departure_time)
+            departure_times.pop()
             num_departures += 1
     
     e_n = total_packets / observations
     p_loss = (loss_counter / (num_arrivals + lost_arrivals)) * 100
     p_idle = (empty_counter / observations) * 100
     # print(e_n, p_loss, p_idle)
+    print("Finished a DES")
     return (e_n, p_loss, p_idle)
 
 def q1():
@@ -203,6 +206,7 @@ def q3(T=1000):
 
     C, L, = 10 ** 6, 2000
     rho_list = [0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
+    
     events_list_args = []
 
     # For each value of rho, we compute the arrival rate, and append to our
@@ -274,46 +278,59 @@ def q6():
             K_args.append(K)
             l_args.append(l)
     
-    events_list = pool.map(buildEventsForFiniteBufferWrapper, events_list_args)
+    all_events_list = []
+    for i in [0, 11, 22]:
+        events_list = pool.map(buildEventsForFiniteBufferWrapper, events_list_args[i:i+11])
+        all_events_list.append(events_list)
     print("done building events")
     
-    # T, l, L, C, K, events
-    for events, K, l in zip(events_list, K_args, l_args):
-        des_list_args.append((T, l, L, C, K, events))
+    i = 0
+    for events_list in all_events_list:
+        for events in events_list:
+            des_list_args.append((T, l_args[i], L, C, K_args[i], events))
+            i = i + 1
 
-    results = pool.map(finiteBufferDesWrapper, des_list_args)
+    all_results_list = []
+    for i in [0, 11, 22]:
+        results_list = pool.map(finiteBufferDesWrapper, des_list_args[i:i+11])
+        all_results_list.append(results_list)
     print("done running simulation")
 
     count = 0
     e_n = []
     p_loss = []
-    for result in results:
-        e_n.append(result[0])
-        p_loss.append(result[1])
-        if count % (len(rho_steps) - 1) == 0 and count != 0:
-            E_Ns.append(e_n)
-            P_LOSSes.append(p_loss)
-            e_n = []
-            p_loss = []
-            count = 0
-        else:
-            count = count + 1
-        
+    for results_list in all_results_list:
+        for result in results_list:
+            e_n.append(result[0])
+            p_loss.append(result[1])
+            if count % (len(rho_steps) - 1) == 0 and count != 0:
+                E_Ns.append(e_n)
+                P_LOSSes.append(p_loss)
+                e_n = []
+                p_loss = []
+                count = 0
+            else:
+                count = count + 1
+    
+    f = plt.figure()
     for i in range(len(E_Ns)):
         plt.plot(rho_steps, E_Ns[i], label=f"K = {K_steps[i]}")
     plt.legend(loc="upper left")
     plt.title(r'E[N] vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel('Average number in system E[N]')
-    plt.show()
+    # plt.show()
+    f.savefig("en_q6_figure.pdf")
 
+    f = plt.figure()
     for i in range(len(P_LOSSes)):
         plt.plot(rho_steps, P_LOSSes[i], label=f"K = {K_steps[i]}")
     plt.legend(loc="upper left")
     plt.title(r'$P_{loss}$ vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel(r'$P_{loss}$ (%)')
-    plt.show()
+    # plt.show()
+    f.savefig("ploss_q6_figure.pdf")
 
 # testRobustnessOfFiniteBuffer()
 q6()
