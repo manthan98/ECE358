@@ -106,21 +106,7 @@ def buildEventsForFiniteDes(T, l):
         if obs_t < T:
             obs_t += generateRandomVariable(5 * l)
             event_queue.appendleft(Event(obs_t, EventType.OBSERVER))
-    
-    # event_queue.sort(key=lambda x: x.time, reverse=True)
-    print("Finished an event gen")
     return event_queue
-
-def testRobustnessOfFiniteBuffer():
-    # rho_steps = [0.5, 1.5]
-    rho = 1.5
-    K_steps = 25
-    T = 4000
-    L, C = 2000, 10 ** 6
-    l = rho * (C / L)
-    event_queue = buildEventsForFiniteDes(T,l)
-    e_n, p_loss, p_idle = finiteBufferDes(T, l, L, C, K_steps, event_queue)
-    print("E[n]: ", e_n, " P_loss: ", p_loss, " p_idle: ", p_idle)    
 
 def finiteBufferDes(T, l, L, C, K, events):
     # setup variables for computing e_n and p_loss
@@ -184,8 +170,6 @@ def finiteBufferDes(T, l, L, C, K, events):
     e_n = total_packets / observations
     p_loss = (loss_counter / (num_arrivals + lost_arrivals)) * 100
     p_idle = (empty_counter / observations) * 100
-    # print(e_n, p_loss, p_idle)
-    print("Finished a DES")
     return (e_n, p_loss, p_idle)
 
 def q1():
