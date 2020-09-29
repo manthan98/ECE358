@@ -110,14 +110,18 @@ def buildEventsForFiniteDes(T, l):
 
 def finiteBufferDes(T, l, L, C, K, events):
     # setup variables for computing e_n and p_loss
-    # num_arrivals: number of arrival events of packets that are not dropped
+    # num_arrivals: number of arrival events of packets that 
+    # are not dropped
     # num_departures: number of departure events
-    # total_packets: the total number of packets, dropped and not dropped
+    # total_packets: the total number of packets, dropped and 
+    # not dropped
     # observations: number of observation events
     # empty_counter: times during an observation the queue is empty
-    # last_departure_time: the departure time of the most recently departed packet
+    # last_departure_time: the departure time of the most recently 
+    # departed packet
     # loss_counter = number of packets dropepd
-    # lost_arrivals = number of arrival events of packets that are dropped
+    # lost_arrivals = number of arrival events of packets that 
+    # are dropped
     num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
     last_departure_time, loss_counter = 0, 0
     lost_arrivals = 0
@@ -127,11 +131,13 @@ def finiteBufferDes(T, l, L, C, K, events):
         departure_time = departure_times[-1] if departure_times else float('inf')
         event = events[-1]
 
-        # exit function if event time or departure time is greater than the simulation time
+        # exit function if event time or departure time is greater 
+        # than the simulation time
         if event.time >= T or last_departure_time >= T:
             break
 
-        # Note: num_arrivals only refers to packets that will have a corresponding departure
+        # Note: num_arrivals only refers to packets that will have a 
+        # corresponding departure
         buffer_length = num_arrivals - num_departures
         if event.time < departure_time:
             events.pop()
@@ -145,8 +151,10 @@ def finiteBufferDes(T, l, L, C, K, events):
 
                 # the service rate follows an exponential distribution 
                 service_time = generateRandomVariable(1 / L) / C
-                # if buffer is empty, departure time is the service time + the arrival time
-                # if buffer is not empty, departure time is the service time + the departure time 
+                # if buffer is empty, departure time is the 
+                # service time + the arrival time
+                # if buffer is not empty, departure time is 
+                # the service time + the departure time 
                 # of the last packet
                 if buffer_length == 0:
                     last_departure_time = service_time + event.time
@@ -256,26 +264,27 @@ def q4():
     des = infiniteBufferDes(events, T, L, C)
     print(des[0], des[1])
 
-def q6():
+def q6(T=1000):
     # setup lists to append values to
     E_Ns = []
     P_LOSSes = []
 
     # from lab manual: traffic intensity (rho), queue size (K), 
     # avg. length of packet (L), transmission rate (C)
-    # Note: simulation time (T) was determined according to the process described
-    # in the manual
+    # Note: simulation time (T) was determined according to 
+    # the process described in the manual
     rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     K_steps = [10, 25, 50]
-    T = 1000
     L, C = 2000, 10 ** 6
 
     # for each queue:
-    # 1. calculate average number of packets arrived (lambda) for each value of rho
+    # 1. calculate average number of packets arrived (lambda) for 
+    #    each value of rho
     # 2. generate events
     # 3. run finite buffer simulation (M/M/1/K) with generated events
-    # 4. extract two metrics: average number of packets in queue (E[N]) and packet 
-    #    loss probability (Ploss) from each simulation result
+    # 4. extract two metrics: average number of packets in queue 
+    #    (E[N]) and packet loss probability (Ploss) from each 
+    #    simulation result
     for K in K_steps:
         e_n = []
         p_loss = []
@@ -297,7 +306,7 @@ def q6():
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel('Average number in system E[N]')
     plt.show()
-    f.savefig("en_vs_p_q6_figure.pdf")
+    f.savefig("en_q6_figure.pdf")
 
     # plot Ploss as a function of rho for each K
     f = plt.figure()
@@ -308,6 +317,6 @@ def q6():
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel(r'$P_{loss}$ (%)')
     plt.show()
-    f.savefig("ploss_vs_p_q6_figure.pdf")
+    f.savefig("ploss_q6_figure.pdf")
 
 q6()
