@@ -255,15 +255,25 @@ def q4():
     print(des[0], des[1])
 
 def q6():
-    # Setup lists to append values to as: 0.5 < rho < 1.5.
+    # setup lists to append values to
     E_Ns = []
     P_LOSSes = []
 
+    # from lab manual: traffic intensity (rho), queue size (K), 
+    # avg. length of packet (L), transmission rate (C)
+    # Note: simulation time (T) was determined according to the process described
+    # in the manual
     rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
     K_steps = [10, 25, 50]
     T = 1000
     L, C = 2000, 10 ** 6
 
+    # for each queue:
+    # 1. calculate average number of packets arrived (lambda) for each value of rho
+    # 2. generate events
+    # 3. run finite buffer simulation (M/M/1/K) with generated events
+    # 4. extract two metrics: average number of packets in queue (E[N]) and packet 
+    #    loss probability (Ploss) from each simulation result
     for K in K_steps:
         e_n = []
         p_loss = []
@@ -276,6 +286,7 @@ def q6():
         E_Ns.append(e_n)
         P_LOSSes.append(p_loss)
 
+    # plot E[N] as a function of rho for each K
     f = plt.figure()
     for i in range(len(E_Ns)):
         plt.plot(rho_steps, E_Ns[i], label=f"K = {K_steps[i]}")
@@ -286,6 +297,7 @@ def q6():
     plt.show()
     f.savefig("en_vs_p_q6_figure.pdf")
 
+    # plot Ploss as a function of rho for each K
     f = plt.figure()
     for i in range(len(P_LOSSes)):
         plt.plot(rho_steps, P_LOSSes[i], label=f"K = {K_steps[i]}")
