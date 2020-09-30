@@ -317,4 +317,4 @@ def q6(T=1000):
     plt.ylabel(r'$P_{loss}$ (%)')
     f.savefig("ploss_q6_figure.pdf")
 
-q6()
+# Call method here
