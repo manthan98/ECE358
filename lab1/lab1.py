@@ -305,7 +305,6 @@ def q6(T=1000):
     plt.title(r'E[N] vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel('Average number in system E[N]')
-    plt.show()
     f.savefig("en_q6_figure.pdf")
 
     # plot Ploss as a function of rho for each K
@@ -316,7 +315,6 @@ def q6(T=1000):
     plt.title(r'$P_{loss}$ vs $\rho$ as K increases')
     plt.xlabel(r'Traffic Intensity ($\rho$)')
     plt.ylabel(r'$P_{loss}$ (%)')
-    plt.show()
     f.savefig("ploss_q6_figure.pdf")
 
-# Call function here
+q6()
