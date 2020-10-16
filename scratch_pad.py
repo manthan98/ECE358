@@ -1,169 +1,121 @@
 import random
 import math
-import time
-from enum import Enum
-import matplotlib.pyplot as plt
+import collections
 
-class EventType(Enum):
-    ARRIVAL = 0
-    OBSERVER = 1
-
-class Event:
-    def __init__(self, time, event_type):
-        self.time = time
-        self.event_type = event_type
-
-def generateRandomVariable(l=75):
+def generate_random_variable(l=12):
     u = random.uniform(0, 1)
     x = (-1 / l) * math.log(1 - u)
     return x
 
-def buildEventsForFiniteDes(T, l):
-    event_queue = []
+def generate_packet_arrivals(num_nodes, T_sim):
+    arrival_packets = []
+    for i in range(num_nodes):
+        curr_time = 0
+        curr_packets = []
 
-    delta_t, obs_t = 0, 0
-    while delta_t < T or obs_t < T:
-        if delta_t < T:
-            delta_t += generateRandomVariable(l)
-            event_queue.append(Event(delta_t, EventType.ARRIVAL))
+        while curr_time < T_sim:
+            curr_time += generate_random_variable()
+            if curr_time < T_sim:
+                curr_packets.append(curr_time)
+        
+        curr_packets.reverse()
+        arrival_packets.append(curr_packets)
 
-        if obs_t < T:
-            obs_t += generateRandomVariable(5 * l)
-            event_queue.append(Event(obs_t, EventType.OBSERVER))
-    
-    event_queue.sort(key=lambda x: x.time, reverse=False)
-    return event_queue
+    print(len(arrival_packets))
+    return arrival_packets
 
-def finiteBufferDesV2(T, l, L, C, K, events):
-    num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
-    last_departure_time, loss_counter = 0, 0
-    lost_arrivals = 0
+def persistent_csma_cd(num_nodes, arrival_packets, T_sim, D, S, L, R):
+    total_tx, success_tx = 0, 0
 
-    departure_times = []
-    while len(events) > 0:
-        departure_time = departure_times[0] if len(departure_times) > 0 else float('inf')
-        event = events[0]
+    min_queue_idx = 0
+    curr_time = 0
 
-        if event.time >= T or last_departure_time >= T:
+    collisions = [0] * num_nodes
+
+    while curr_time < T_sim:
+        curr_time = float('inf')
+        for i in range(len(arrival_packets)):
+            if not len(arrival_packets[i]) > 0:
+                continue
+            if arrival_packets[i][-1] < curr_time:
+                curr_time = arrival_packets[i][-1]
+                min_queue_idx = i
+        
+        if curr_time == float('inf'):
             break
 
-        buffer_length = num_arrivals - num_departures
-        if event.time < departure_time:
-            events.pop(0)
-            if event.event_type == EventType.ARRIVAL:
-                print("ARRIVAL", event.time)
-                if buffer_length == K:
-                    loss_counter += 1
-                    lost_arrivals += 1
-                    continue
+        print(curr_time)
+        collision_detected = False
 
-                service_time = generateRandomVariable(1 / L) / C
-                if buffer_length == 0:
-                    last_departure_time = service_time + event.time
-                    departure_times.append(last_departure_time)
-                else:
-                    last_departure_time += service_time
-                    departure_times.append(last_departure_time)
-                
-                num_arrivals += 1
-            else:
-                print("OBSERVER", event.time)
-                total_packets += buffer_length
-                observations += 1
-                if buffer_length == 0:
-                    empty_counter += 1
-        else:
-            print("DEPARTURE", departure_time)
-            departure_times.pop(0)
-            num_departures += 1
-    
-    e_n = total_packets / observations
-    p_loss = (loss_counter / (num_arrivals + lost_arrivals)) * 100
-    p_idle = (empty_counter / observations) * 100
-    print(e_n, p_loss, p_idle)
-    return (e_n, p_loss, p_idle)
-
-def finiteBufferDes(T, l, L, C, K, arrival_times, observer_times):
-    num_arrivals, num_departures, total_packets, observations, empty_counter = 0, 0, 0, 0, 0
-    last_departure_time, loss_counter = 0, 0
-
-    departure_times = []
-    while len(arrival_times) > 0:
-        departure_time = departure_times[0] if len(departure_times) > 0 else float('inf')
-        if arrival_times[0] >= T:
-            break
-
-        buffer_length = num_arrivals - num_departures
-        if arrival_times[0] < departure_time and arrival_times[0] < observer_times[0]:
-            arrival_time = arrival_times.pop(0)
-            print("ARRIVAL", arrival_time)
-            if buffer_length == K:
-                loss_counter += 1
+        for i in range(len(arrival_packets)):
+            if i == min_queue_idx:
+                continue
+            if not len(arrival_packets[i]) > 0:
                 continue
 
-            num_arrivals += 1
-            service_time = generateRandomVariable(1 / L) / C
-            if buffer_length == 0:
-                departure_times.append(arrival_time + service_time)
+            T_prop = (D / S) * abs(i - min_queue_idx)
+            T_first_bit = arrival_packets[min_queue_idx][-1] + T_prop
+            T_final_bit = arrival_packets[min_queue_idx][-1] + T_prop + (L / R)
+
+            if arrival_packets[i][-1] < T_first_bit:
+                collision_detected = True
+                collisions[i] += 1
+
+                if collisions[i] > 10:
+                    collisions[i] = 10
+                    arrival_packets[i].pop()
+                else:
+                    T_backoff = random.randrange(0, 2**collisions[i]) * (512 / R)
+                    T_wait = T_final_bit + T_backoff
+                    
+                    for j in reversed(range(len(arrival_packets[i]))):
+                        if arrival_packets[i][j] < T_wait:
+                            arrival_packets[i][j] = T_wait
+                            total_tx += 1
+                
+                total_tx += 1
+        
+        if collision_detected:
+            collision_detected = False
+            collisions[min_queue_idx] += 1
+
+            if collisions[min_queue_idx] > 10:
+                collisions[min_queue_idx] = 0
+                arrival_packets[min_queue_idx].pop()
             else:
-                departure_times.append(last_departure_time + service_time)
-        elif observer_times[0] < arrival_times[0] and observer_times[0] < departure_time:
-            observer_time = observer_times.pop(0)
-            print("OBSERVER", observer_time)
-            total_packets += buffer_length
-            observations += 1
-            if buffer_length == 0:
-                empty_counter += 1
-        elif departure_time < arrival_times[0] and departure_time < observer_times[0]:
-            last_departure_time = departure_times.pop(0)
-            print("DEPARTURE", last_departure_time)
-            num_departures += 1
+                # T_prop = (D / S) * max(len(arrival_packets) - min_queue_idx - 1, min_queue_idx - 0)
+                T_backoff = random.randrange(0, 2**collisions[min_queue_idx]) * (512 / R)
+                T_wait = arrival_packets[min_queue_idx][-1] + min(T_prop, (L / R)) + T_backoff
+
+                for i in reversed(range(len(arrival_packets[min_queue_idx]))):
+                    if arrival_packets[min_queue_idx][i] < T_wait:
+                        arrival_packets[min_queue_idx][i] = T_wait
+        else:
+            for i in range(len(arrival_packets)):
+                if i == min_queue_idx:
+                    continue
+
+                T_prop = (D / S) * abs(min_queue_idx - i)
+                T_first_bit = arrival_packets[min_queue_idx][-1] + T_prop
+                T_final_bit = arrival_packets[min_queue_idx][-1] + T_prop + (L / R)
+                for j in reversed(range(len(arrival_packets[i]))):
+                    if arrival_packets[i][j] > T_first_bit and arrival_packets[i][j] < T_final_bit:
+                        arrival_packets[i][j] = T_final_bit
+            
+            collisions[min_queue_idx] = 0
+            arrival_packets[min_queue_idx].pop()
+            success_tx += 1
+        
+        total_tx += 1
     
-    e_n = total_packets / observations
-    print(e_n, loss_counter)
-    return (e_n, loss_counter)
+    print("DONE!")
+    print(success_tx / total_tx)
 
 
-# rho, L, C = 0.5, 2000, 10 ** 6
-# T = 50
-# l = rho * (C / L)
-# K = 10
-# events = buildEventsForFiniteDes(T, l)
-# finiteBufferDesV2(T, l, L, C, K, events)
-
-def q6():
-    rho_steps = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
-    K_steps = [10, 25, 40]
-    T = 50
-    L, C = 2000, 10 ** 6
-
-    E_Ns = []
-    P_LOSSes = []
-
-    for K in K_steps:
-        e_n = []
-        p_loss = []
-        for rho in rho_steps:
-            l = rho * (C / L)
-            events = buildEventsForFiniteDes(T, l)
-            des = finiteBufferDesV2(T, l, L, C, K, events)
-            e_n.append(des[0])
-            p_loss.append(des[1])
-        E_Ns.append(e_n)
-        P_LOSSes.append(p_loss)
-
-    for i in range(len(E_Ns)):
-        plt.plot(rho_steps, E_Ns[i], label=f"K = {K_steps[i]}")
-    plt.legend(loc="upper left")
-    plt.xlabel(r'Traffic Intensity ($\rho$)')
-    plt.ylabel('Average number in system E[N]')
-    plt.show()
-
-    for i in range(len(P_LOSSes)):
-        plt.plot(rho_steps, P_LOSSes[i], label=f"K = {K_steps[i]}")
-    plt.legend(loc="upper left")
-    plt.xlabel(r'Traffic Intensity ($\rho$)')
-    plt.ylabel(r'$P_{loss}$ (%)')
-    plt.show()
-
-q6()
+C = 3 * (10 ** 8)
+S = (2 / 3) * C
+D = 10
+L = 1500
+R = 10**6
+arrival_packets = generate_packet_arrivals(20, 100)
+persistent_csma_cd(20, arrival_packets, 200, D, S, L, R)
