@@ -257,6 +257,7 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         else:
             success_tx += 1
             total_tx += 1
+            transmitter_node.bus_busy_counter = 0
 
             last_packet = transmitter_node.packets.popleft()
             if len(transmitter_node.packets) > 0:
@@ -284,8 +285,6 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
 
                     T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
                     packet.arrival_time += T_random_wait
-
-                packet.bus_busy_counter = 0
                     
     print("Done simulation!")
     efficiency = success_tx / total_tx
