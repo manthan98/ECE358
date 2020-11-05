@@ -273,18 +273,19 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
 
                 # If this node's packet was to be transmitted after the first bit, but before the last bit of the current transmitting node's packet,
                 # we must re-schedule the packet to be its current time plus an exponential backoff
-                if transmitter_node_packet.arrival_time + T_prop <= packet.arrival_time < transmitter_node_packet.arrival_time + T_prop + L / R:
-                    packet.bus_busy_counter += 1
-                    if packet.bus_busy_counter <= 10:
-                        T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
-                        packet.arrival_time += T_random_wait
-                        # packet.arrival_time += T_random_wait + transmitter_node_packet.arrival_time + T_prop + L/R
+                while transmitter_node_packet.arrival_time + T_prop <= packet.arrival_time < transmitter_node_packet.arrival_time + T_prop + L / R:
+                    if packet.bus_busy_counter < 10:
+                        packet.bus_busy_counter += 1
                     else:
-                        # drop the packet
-                        packet.bus_busy_counter = 0
                         last_packet = nodes[i].packets.popleft()
                         if len(nodes[i].packets) > 0:
                             nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, last_packet.arrival_time)
+                        break
+
+                    T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
+                    packet.arrival_time += T_random_wait
+
+                packet.bus_busy_counter = 0
                     
     print("Done simulation!")
     efficiency = success_tx / total_tx
@@ -384,7 +385,7 @@ def q2():
     plt.xlabel("Number of nodes (N)")
     plt.ylabel("Efficiency")
     plt.legend(loc="upper right")
-    # plt.show()
+    plt.show()
     f.savefig("non_persistent_csma_cd_eff")
 
     f = plt.figure()
@@ -394,9 +395,8 @@ def q2():
     plt.xlabel("Number of node (N)")
     plt.ylabel("Throughput (Mbps)")
     plt.legend(loc="lower right")
-    # plt.show()
+    plt.show()
     f.savefig("non_persistent_csma_cd_tput")
 
 # Call method here
-# q2()
-test()
+q2()
