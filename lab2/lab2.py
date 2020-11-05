@@ -1,7 +1,13 @@
+import os
+import matplotlib as mpl
+if os.environ.get('DISPLAY','') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+import matplotlib.pyplot as plt
 import random
 import math
 import collections
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 def generate_random_variable(l=5):
     u = random.uniform(0, 1)
@@ -231,6 +237,9 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         # Helper variables to access transmitter node and packet.
         transmitter_node = nodes[min_queue_idx]
         transmitter_node_packet = transmitter_node.packets[0]
+
+        # Node was able to transmit which means it checked the bus, and it was idle
+        transmitter_node_packet.bus_busy_counter = 0
         
         # If the transmitting node collided with any other nodes, it's packet arrival time must be updated (or dropped). Otherwise, the packet
         # must be removed from the transmitting node's packet queue.
@@ -261,18 +270,21 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
 
                 packet = nodes[i].packets[0]
                 T_prop = abs(i - min_queue_idx) * (D / S)
-                T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
 
                 # If this node's packet was to be transmitted after the first bit, but before the last bit of the current transmitting node's packet,
-                # we must re-schedule the packet to be the time of the transmitting node plus the randome wait time
+                # we must re-schedule the packet to be its current time plus an exponential backoff
                 if transmitter_node_packet.arrival_time + T_prop <= packet.arrival_time < transmitter_node_packet.arrival_time + T_prop + L / R:
                     packet.bus_busy_counter += 1
                     if packet.bus_busy_counter <= 10:
-                        packet.arrival_time = transmitter_node_packet.arrival_time + T_random_wait
+                        T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
+                        packet.arrival_time += T_random_wait
+                        # packet.arrival_time += T_random_wait + transmitter_node_packet.arrival_time + T_prop + L/R
                     else:
-                        last_packet = node.packets.popleft()
-                        if len(node.packets) > 0:
-                            node.packets[0].arrival_time = max(node.packets[0].arrival_time, last_packet.arrival_time)
+                        # drop the packet
+                        packet.bus_busy_counter = 0
+                        last_packet = nodes[i].packets.popleft()
+                        if len(nodes[i].packets) > 0:
+                            nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, last_packet.arrival_time)
                     
     print("Done simulation!")
     efficiency = success_tx / total_tx
@@ -281,8 +293,8 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
     return (efficiency, throughput)
 
 def test():
-    A = [5, 12]
-    N = [20, 30, 40, 50, 60, 70, 80, 90, 100]
+    A = [7]
+    N = [100]
     T_sim = 1000
     S = 2 * (10**8)
     D = 10
@@ -293,13 +305,13 @@ def test():
     for a in A:
         res = []
         for n in N:
-            eff = persistent_csma_cd(n, a, T_sim, D, S, L, R)
+            eff = non_persistent_csma_cd(n, a, T_sim, D, S, L, R)
             res.append(eff)
         overall_res.append(res)
     
     for res in overall_res:
         plt.plot(N, res)
-    plt.show()
+    # plt.show()
 
 def q1():
     A = [7, 10, 20]
@@ -345,8 +357,8 @@ def q1():
 
 def q2():
     A = [7, 10, 20]
-    N = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    T_sim = 1000
+    N = [20, 40, 60, 80, 100]
+    T_sim = 100 # reduced for the sake of faster testing
     C = 3 * (10**8)
     S = (2 / 3) * C
     D = 10
@@ -359,7 +371,7 @@ def q2():
         efficiencies = []
         throughputs = []
         for n in N:
-            res = persistent_csma_cd(n, a, T_sim, D, S, L, R)
+            res = non_persistent_csma_cd(n, a, T_sim, D, S, L, R)
             efficiencies.append(res[0])
             throughputs.append(res[1])
         overall_efficiencies.append(efficiencies)
@@ -372,18 +384,19 @@ def q2():
     plt.xlabel("Number of nodes (N)")
     plt.ylabel("Efficiency")
     plt.legend(loc="upper right")
-    plt.show()
+    # plt.show()
     f.savefig("non_persistent_csma_cd_eff")
 
     f = plt.figure()
     for idx, throughputs in enumerate(overall_throughputs):
         plt.plot(N, throughputs, label=f"A = {A[idx]}")
-    plt.title("Throughput vs Number of nodes for persistent CSMA/CD")
+    plt.title("Throughput vs Number of nodes for Non-Persistent CSMA/CD")
     plt.xlabel("Number of node (N)")
     plt.ylabel("Throughput (Mbps)")
     plt.legend(loc="lower right")
-    plt.show()
+    # plt.show()
     f.savefig("non_persistent_csma_cd_tput")
 
 # Call method here
-q2()
+# q2()
+test()
