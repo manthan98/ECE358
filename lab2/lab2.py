@@ -1,13 +1,13 @@
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY','') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
+# if os.environ.get('DISPLAY','') == '':
+#     print('no display found. Using non-interactive Agg backend')
+#     mpl.use('Agg')
 import matplotlib.pyplot as plt
 import random
 import math
 import collections
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 def generate_random_variable(l=5):
     u = random.uniform(0, 1)
@@ -199,7 +199,7 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         if curr_time == float('inf'):
             break
 
-        print(curr_time)
+        # print(curr_time)
 
         # To keep track of any collisions between transmitting node and all other nodes.
         collision_detected = False
@@ -237,9 +237,6 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         # Helper variables to access transmitter node and packet.
         transmitter_node = nodes[min_queue_idx]
         transmitter_node_packet = transmitter_node.packets[0]
-
-        # Node was able to transmit which means it checked the bus, and it was idle
-        transmitter_node_packet.bus_busy_counter = 0
         
         # If the transmitting node collided with any other nodes, it's packet arrival time must be updated (or dropped). Otherwise, the packet
         # must be removed from the transmitting node's packet queue.
@@ -257,7 +254,9 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         else:
             success_tx += 1
             total_tx += 1
-            transmitter_node.bus_busy_counter = 0
+
+            # Node was able to successfully transmit the packet, so we reset the busy counter on the packet.
+            transmitter_node_packet.bus_busy_counter = 0
 
             last_packet = transmitter_node.packets.popleft()
             if len(transmitter_node.packets) > 0:
