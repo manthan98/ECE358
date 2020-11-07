@@ -257,7 +257,9 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
         else:
             success_tx += 1
             total_tx += 1
-            transmitter_node.bus_busy_counter = 0
+            transmitter_node_packet = transmitter_node.packets[0]
+            # transmitter_node_packet.bus_busy_counter = 0
+            # transmitter_node.bus_busy_counter = 0
 
             last_packet = transmitter_node.packets.popleft()
             if len(transmitter_node.packets) > 0:
@@ -277,14 +279,20 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
                 while transmitter_node_packet.arrival_time + T_prop <= packet.arrival_time < transmitter_node_packet.arrival_time + T_prop + L / R:
                     if packet.bus_busy_counter < 10:
                         packet.bus_busy_counter += 1
+                        T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
+                        packet.arrival_time += T_random_wait
                     else:
                         last_packet = nodes[i].packets.popleft()
                         if len(nodes[i].packets) > 0:
-                            nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, last_packet.arrival_time)
-                        break
+                            packet = nodes[i].packets[0]
+                        else:
+                            break
+                            # nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, last_packet.arrival_time)
+                            # nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, transmitter_node_packet.arrival_time + T_prop + L / R)
+                            # if len(nodes[i].packets) > 0:
+                            #     packet = nodes[i].packets[0]
 
-                    T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
-                    packet.arrival_time += T_random_wait
+                packet.bus_busy_counter = 0
                     
     print("Done simulation!")
     efficiency = success_tx / total_tx
@@ -293,9 +301,9 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
     return (efficiency, throughput)
 
 def test():
-    A = [7]
+    A = [20]
     N = [100]
-    T_sim = 1000
+    T_sim = 100
     S = 2 * (10**8)
     D = 10
     L = 1500
@@ -316,7 +324,7 @@ def test():
 def q1():
     A = [7, 10, 20]
     N = [20, 30, 40, 50, 60, 70, 80, 90, 100]
-    T_sim = 1000
+    T_sim = 100
     C = 3 * (10**8)
     S = (2 / 3) * C
     D = 10
@@ -358,7 +366,7 @@ def q1():
 def q2():
     A = [7, 10, 20]
     N = [20, 40, 60, 80, 100]
-    T_sim = 100 # reduced for the sake of faster testing
+    T_sim = 100
     C = 3 * (10**8)
     S = (2 / 3) * C
     D = 10
@@ -384,7 +392,7 @@ def q2():
     plt.xlabel("Number of nodes (N)")
     plt.ylabel("Efficiency")
     plt.legend(loc="upper right")
-    plt.show()
+    # plt.show()
     f.savefig("non_persistent_csma_cd_eff")
 
     f = plt.figure()
@@ -394,8 +402,9 @@ def q2():
     plt.xlabel("Number of node (N)")
     plt.ylabel("Throughput (Mbps)")
     plt.legend(loc="lower right")
-    plt.show()
+    # plt.show()
     f.savefig("non_persistent_csma_cd_tput")
 
 # Call method here
 q2()
+# test()
