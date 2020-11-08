@@ -1,5 +1,5 @@
 import os
-import matplotlib as mpl
+# import matplotlib as mpl
 # if os.environ.get('DISPLAY','') == '':
 #     print('no display found. Using non-interactive Agg backend')
 #     mpl.use('Agg')
@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import random
 import math
 import collections
-import matplotlib.pyplot as plt
 
 def generate_random_variable(l=5):
     u = random.uniform(0, 1)
@@ -276,14 +275,13 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
                 while transmitter_node_packet.arrival_time + T_prop <= packet.arrival_time < transmitter_node_packet.arrival_time + T_prop + L / R:
                     if packet.bus_busy_counter < 10:
                         packet.bus_busy_counter += 1
+                        T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
+                        packet.arrival_time += T_random_wait
                     else:
                         last_packet = nodes[i].packets.popleft()
                         if len(nodes[i].packets) > 0:
                             nodes[i].packets[0].arrival_time = max(nodes[i].packets[0].arrival_time, last_packet.arrival_time)
                         break
-
-                    T_random_wait = random.randint(0, 2**packet.bus_busy_counter - 1) * (512 / R)
-                    packet.arrival_time += T_random_wait
                     
     print("Done simulation!")
     efficiency = success_tx / total_tx
@@ -292,8 +290,8 @@ def non_persistent_csma_cd(N, A, T_sim, D, S, L, R):
     return (efficiency, throughput)
 
 def test():
-    A = [7]
     N = [100]
+    A = [20]
     T_sim = 1000
     S = 2 * (10**8)
     D = 10
@@ -357,7 +355,7 @@ def q1():
 def q2():
     A = [7, 10, 20]
     N = [20, 40, 60, 80, 100]
-    T_sim = 100 # reduced for the sake of faster testing
+    T_sim = 1000 
     C = 3 * (10**8)
     S = (2 / 3) * C
     D = 10
