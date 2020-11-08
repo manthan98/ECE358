@@ -14,4 +14,6 @@ The code to populate a LAN with nodes can be found in the `populate_nodes(...)` 
 
 ## Non-persistent CSMA/CD
 
-Todo.
+To run the results associated with question 2, call the `q2()` method, and run the Python file. The `q2()` method will sweep through all values of N for all values of A with the pre-defined constants as defined in the lab manual. The average time it takes to run `q2()` with default T = 1000 s for each simulation is approximately 10 minutes. At the end of the simulation, two plots will be generated and saved as `non_persistent_csma_cd_eff.png` and `non_persistent_csma_cd_tput.png`, for efficiency and throughput, respectively.
+
+The code to populate a LAN with nodes can be found in the `populate_nodes(...)` method. The non-persistent CSMA/CD simulation code can be found in the `non_persistent_csma_cd(...)` method.
