@@ -399,4 +399,3 @@ def q2():
     f.savefig("non_persistent_csma_cd_tput")
 
 # Call method here
-q2()
